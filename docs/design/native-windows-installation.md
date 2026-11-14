@@ -656,9 +656,13 @@ table with `python tests/test_windows_path_budget.py`.
 `LongPathsEnabled` off on its own runner, proves in a new process that a
 260-character path is refused, runs the real session and capture stores under a
 folder path of exactly 59 characters, and restores the runner's value. It
-installs the locked dependencies, so its source-store case needs a locked
-Foundation revision of `7526bb55` or later; before that the case is skipped by
-name. It is not setup-file or clean-account acceptance.
+installs the locked dependencies, and the lock selects Foundation `7526bb55`.
+Its source-store case stages a repository as deep as the default bundles
+through Foundation's real store, at folder paths of 59 and 54. It requires
+that the store seals, builds and cleans up files beyond the limit, and that
+Windows accepts or refuses each ordinary path exactly as the budget table
+says: the deepest module file is refused at 59 (264 characters) and opens at
+54 (259). It is not setup-file or clean-account acceptance.
 
 Setup checks the PC and the folder before its first question. Each stop names
 one cause and one next step in plain language, and never shows exception text,
@@ -750,7 +754,15 @@ So the order is:
 4. Stop the app normally and remove its sign-in task. There is no forced stop.
 5. Remove the Apps-list entry, then the shortcuts ("Uninstall Amplifier" last),
    then the emptied Start-menu folder.
-6. One message says that uninstall is complete.
+6. If Windows trusts this installation's own key-less certificate for this
+   person, ask Windows once to delete it (`windows_trust.remove_root`). Windows
+   itself asks the person; its default answer is No. The first question
+   announces this. Every outcome finishes the uninstall: a certificate that
+   stays has no signing key anywhere and names only this PC. There is no
+   second attempt, no elevation and no Local Machine store. An identity from
+   an earlier setup added nothing and is not touched.
+7. One message says that uninstall is complete. It says so when Windows kept
+   the certificate.
 
 A step that fails leaves the entries of every later step in place and shows
 one message with the cause, the next action and a short reference (step name,
@@ -790,8 +802,8 @@ replace it. A new installation gets this behavior from its setup file. An
 earlier installation gets it only when its launcher is refreshed. The count
 in step 2 comes from the running app, which in-app updates do replace.
 
-Not in this change: uninstall still keeps the program files, the person's data
-and the trusted certificate. A changed shortcut or Apps-list entry still makes
+Not in this change: uninstall still keeps the program files and the person's
+data. A changed shortcut or Apps-list entry still makes
 uninstall refuse. The Apps list still shows the version that setup installed.
 The native check in the `windows-local-connection` job uses the real
 shortcuts, the real registry transaction, private files and NTFS sharing on a
