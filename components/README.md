@@ -84,20 +84,12 @@ The web client has a different ownership arrangement, described below.
 
 The [Amplifier web client](https://github.com/microsoft/amplifier-client-web) owns
 browser source, client tests, production dependencies and its build tools.
-Until an approved repository-delivery cutover, **client changes intended for
-Unified must be maintained in both repositories**: author in the client repository,
-then refresh the committed [`web-client/`](web-client/) delivery copy here.
-[`web-client.source.json`](web-client.source.json) selects the canonical commit,
-source digest and delivery location. This is one authoring owner and one required
-selected delivery copy, not two places to develop the client.
-
-While selected-copy delivery remains in use, release acceptance verifies that
-the canonical selected commit and this entire copy stay
-byte-for-byte synchronized. Notify both owners when changing either side and
-carry source, selection record and generated assets through the same handoff.
-A qualified pinned snapshot need not equal the latest client branch tip: record
-accepted upstream changes not yet delivered and assign their next handoff rather
-than silently mixing them into an already qualified artifact.
+[`web-client.source.json`](web-client.source.json) selects an exact accepted public
+repository revision and production-input digest. Preparation fetches that revision
+into ignored `.build/web-client`; no client source snapshot is committed in Unified.
+A qualified selection need not equal the latest client branch tip: record accepted
+upstream changes not yet delivered and assign their next handoff rather than
+silently mixing them into an already qualified artifact.
 
 Unified owns `scripts/web_client_build.py`, canonical shared inputs, package
 assembly and [`tests/web`](../tests/web/README.md). The latter contains host,
@@ -167,65 +159,53 @@ npm run package:artifact -- /tmp/my-web-package PAIRED_SERVER_COMMIT \
   --source-record /tmp/my-web-client/.client-source.json
 ```
 
-Choose a new task-owned directory. Preparation verifies selected source and
-carries `.client-source.json`. In a Git-free source export, this standalone command
-copies only the bounded production manifest; use normal root `prepare` or the
-canonical client checkout for client tests. No Git metadata, dependencies or local
-state is copied. `prepare:inputs` retrieves
+Choose a new task-owned directory. Preparation fetches and verifies the selected
+public source and carries `.client-source.json`, including when Unified itself is
+a Git-free source export. No Git metadata, dependencies or local state is copied.
+`prepare:inputs` retrieves
 only the exact public files pinned by the client; its README also documents
 offline input preparation. A paired-server declaration is not a compatibility
 claim. The selection record is not independent authentication if both source and
 record are replaced.
 
-## Refresh and retire the copy
+## Select public client source
 
 A client-only PR merge is source acceptance, **not delivery in Unified**. The
-responsible owner must carry both locations through this workflow or make an
+responsible owner must carry the selection through this workflow or make an
 explicit handoff to a named integration owner with exact client and Unified
-PRs/revisions and remaining work marked pending. Coordinate with the current
-integration owner rather than duplicating a port or build campaign.
-A canonical-only or copy-only change is not release-ready; a named handoff leaves
-integration pending, not waived.
+revisions and remaining work marked pending. Coordinate with the current owner
+rather than duplicating a port or build campaign.
 
-1. Commit changes in the canonical client first. If work began in Unified's
-   copied tree or disposable prepared source, port it upstream before refreshing.
-   Review the selected revision against the current client and Unified selections;
-   preserve other writers' work and later accepted changes, not just the feature.
-   Pin the exact reviewed and accepted canonical commit, not latest `main` or a
-   merge commit unless that complete tree is accepted.
-2. From the clean selected client commit, run
-   `node scripts/client-source.mjs record /tmp/client-source.json`, then export its
-   whole tracked tree with `git archive HEAD`. Replace only `components/web-client/`
-   and update `components/web-client.source.json` together, retaining
-   `delivery: {"type":"directory","path":"components/web-client"}`. Do not cherry-pick
-   files into the copy or roll selection back to an older feature-only snapshot.
-   Compare the complete tracked tree (file contents and modes) with that exact
-   commit as well as the selection revision and digest; a bounded production-input
-   digest alone does not establish whole-tree equality.
+1. Commit and review changes in the canonical client first. Move any desired
+   local experiment upstream before selection. Review the accepted revision
+   against the current client and Unified selections; preserve later accepted
+   changes rather than selecting an older feature-only snapshot.
+2. From the exact accepted client commit, run
+   `node scripts/client-source.mjs record /tmp/client-source.json`. Update
+   `components/web-client.source.json` with its exact source revision and
+   `inputsSha256`, retaining `delivery: {"type":"repository"}`. The first
+   preparation needs Git, Node and access to that public source. An already
+   prepared exact selection and its locked shared inputs can be reused offline.
+   Do not use a moving branch or generate a replacement client lock.
 3. Use the existing [prepare, test and build workflow](#prepare-test-and-build)
    and [release policy](../docs/validation/release-qualification.md) for affected
-   checks and build ownership. Preparation verifies the exact selection; build
-   and `verify` check artifact provenance. Neither `.build/web-client` nor
-   `amplifier_web/static` is an alternative source owner.
+   checks. Preparation verifies the exact selection; build and `verify` check
+   artifact provenance. Neither `.build/web-client` nor `amplifier_web/static`
+   is an alternative source owner. Released wheel/sdist installs use their
+   included assets without Git, Node or a client source fetch.
 4. Record exact client and Unified PRs/commits, selected source revision, affected
-   checks and any pending integration. Distinguish source acceptance, committed
-   copy selection, build/paired qualification and Unified release; do not report
-   an end-to-end change complete while an intended delivery stage remains pending.
+   checks and any pending integration. Distinguish source acceptance, selection,
+   build/paired qualification and Unified release. A selection edit alone does
+   not deliver new client assets.
 
 Shared catalogs, SDK and normative contracts retain their existing owners. No
 wrapper package, lock or duplicate client tests are generated in Unified.
 
-Public visibility alone does not retire this obligation. Only an approved
-repository-delivery cutover may change delivery to `{"type":"repository"}`;
-remove the copied tree and update this guide and agent guidance in the same review.
-Preparation then fetches the exact commit through Unified's repository-access
-policy. Client verification, artifact format and runtime do not change with
-delivery mode.
+Preparation uses Unified's existing repository-access policy. Client verification,
+artifact format and runtime do not change with delivery mode. Inspect source in
+the canonical repository or its exact prepared selection; the visible source
+record connects that selection to the shipped artifact.
 
-The copied tree is opt-in source-review context and excluded from Unified's
-Python source distribution. Inspect selected source with
-`python scripts/source_context.py --all --format paths --under components/web-client`.
-Ordinary searches do not apply those attributes. Retire obsolete owned prepared
-copies and dependencies after review, retaining useful finite evidence and
-recoverable commits. Refreshing the copy changes the full-tree release identity;
-historical evidence is never relabelled or exempted.
+Retire obsolete owned prepared copies and dependencies after review, retaining
+useful finite evidence and recoverable commits. Historical evidence keeps its
+original source and delivery identity.
