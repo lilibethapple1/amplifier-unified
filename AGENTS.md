@@ -225,6 +225,11 @@ store lacks many public roots (seen in Windows Sandbox: the package registry's
 root entered only after a Windows program asked for that site). An outbound request
 that must work there verifies against the system store plus the bundled roots,
 built per request (`update_checks.registry_trust`). Never turn verification off.
+A new installation has no component generation until its first component
+update; update health then verifies setup's record (`update_health.setup_evidence`),
+which is weaker than a qualified generation and never authorizes preparation.
+The installed-package reader runs Git for a package from a local checkout, so
+a caller without the installation's Git folder on PATH reads "not prepared".
 A folder below the installation folder that the app itself uses as a session
 workspace gets a CLI project name that repeats the installation path, so its
 session paths pass the Windows limit with long paths off (the first chat of
