@@ -23,6 +23,18 @@ def configuration(manager):
     return configuration_key(config.settings, manager.home), config
 
 
+def read_connection(manager):
+    """Read whether a component update must wait for an AI connection.
+
+    Unreadable settings make no claim: the update's own preparation reports them.
+    """
+    from .profile_catalog import connection as selected
+    try:
+        return selected(configuration(manager)[1])
+    except Exception:  # Includes the settings parser's own error type.
+        return {}
+
+
 def active_evidence(manager, *, explain_configuration=False):
     """Verify the selected graph, never prepare it or admit changed declarations.
 
@@ -406,9 +418,10 @@ def failure_events(state):
     return rows
 
 
-def current(state, evidence=None, *, manual_verified=None, explicit_retry=False):
+def current(state, evidence=None, *, manual_verified=None, explicit_retry=False, connection=None):
     """Pure projection of operation/desired/active state; no IO and no read flags."""
     evidence = evidence or {}
+    connection = connection or {}
     seq = state.get('sequence') or {}
     app = state.get('application') or {}
     diagnostics = state.get('diagnostics') or {}
@@ -547,6 +560,15 @@ def current(state, evidence=None, *, manual_verified=None, explicit_retry=False)
         return result('action-required', 'Some tools were not updated',
                       'Their current versions remain installed. Review the failed tool to retry or keep its current version.',
                       action='tools')
+    if (connection.get('needed') and not state.get('appAvailable') and not seq.get('nextStage')
+            and any(row.get('status') == 'update' and row.get('kind') not in {'app', 'smart tool'}
+                    and row.get('id') != 'application' for row in state.get('items', []))):
+        # Not a failure and not an attempt: a component update qualifies the
+        # selected conversation profile, which has no provider yet. Application
+        # and Smart Tool updates do not wait.
+        return result('waiting', 'Components update after you set up an AI connection',
+                      'Nothing failed. Amplifier checks new components together with an AI connection, and none is set up yet. Set up an AI connection in Settings. The update can then start.',
+                      action='connect')
     if state.get('available') or seq.get('nextStage') or any(
             (seq.get(tier) or {}).get('available') for tier in ('included', 'other')):
         return result('available', 'Updates available',
@@ -600,7 +622,9 @@ def publish(manager):
     state['currentStatus'] = current(state, evidence,
         manual_verified=getattr(manager, '_manual_handoff_verified', None),
         explicit_retry=(getattr(manager, '_update_health_configuration_revision', revision) == revision
-                        and getattr(manager, '_retained_retry_available', False)))
+                        and getattr(manager, '_retained_retry_available', False)),
+        connection=(getattr(manager, '_update_connection', None)
+                    if getattr(manager, '_update_health_configuration_revision', revision) == revision else None))
 
 
 async def refresh(manager):
@@ -620,10 +644,13 @@ async def refresh(manager):
         except (OSError, ValueError, TypeError, KeyError):
             return False  # Missing/stale selection proof never offers a retry.
     retry_available = await asyncio.to_thread(retry_action)
+    waiting = await asyncio.to_thread(read_connection, manager)
     if revision == manager.service.state.get('configurationRevision'):
         manager._active_update_evidence = evidence
         manager._update_health_configuration_revision = revision
         manager._retained_retry_available = retry_available
+        manager._update_connection = waiting
     else:
         manager._active_update_evidence = {}
         manager._retained_retry_available = False
+        manager._update_connection = None
